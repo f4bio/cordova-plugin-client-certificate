@@ -1,41 +1,25 @@
 package org.apache.cordova.plugin.clientcert;
 
 import android.annotation.TargetApi;
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Build;
-import android.preference.PreferenceManager;
-import android.security.KeyChain;
-import android.security.KeyChainAliasCallback;
-import android.security.KeyChainException;
-import android.util.Log;
-import android.widget.Toast;
-import org.apache.cordova.CordovaPlugin;
-import org.apache.cordova.CordovaWebView;
-import org.apache.cordova.ICordovaClientCertRequest;
-import org.apache.cordova.CallbackContext;
-import org.apache.cordova.CordovaPlugin;
-import org.apache.cordova.CordovaInterface;
-import org.json.JSONObject;
+import org.apache.cordova.*;
 import org.json.JSONArray;
 import org.json.JSONException;
-import java.security.PrivateKey;
-import java.security.cert.X509Certificate;
-import java.util.concurrent.ExecutorService;
-import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.cert.CertificateFactory;
-import java.util.Collection;
-import java.util.Arrays;
-import java.util.Enumeration;
+
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.Enumeration;
 
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class ClientCertificate extends CordovaPlugin {
 
-    private String p12path = "";
-    private String p12password = "";
+    private String p12FileName = "";
+    private String p12Password = "";
 
     @Override
     public Boolean shouldAllowBridgeAccess(String url) {
@@ -52,21 +36,28 @@ public class ClientCertificate extends CordovaPlugin {
     public boolean onReceivedClientCertRequest(CordovaWebView view, ICordovaClientCertRequest request) {
         try {
             KeyStore keystore = KeyStore.getInstance("PKCS12");
+            keystore.load(null);
+//            android.util.Log.v("chromium", "FilesDir: " + new File(cordova.getActivity().getApplicationContext().getFilesDir(),
+//                    p12FileName).toString());
 
-            InputStream astream = cordova.getActivity().getApplicationContext().getAssets().open(p12path);
-            keystore.load(astream, p12password.toCharArray());
+            InputStream astream = new FileInputStream(new File(cordova.getActivity().getApplicationContext().getFilesDir(),
+                    p12FileName));
+            keystore.load(astream, p12Password.toCharArray());
             astream.close();
             Enumeration e = keystore.aliases();
             if (e.hasMoreElements()) {
                 String ealias = (String) e.nextElement();
-                PrivateKey key = (PrivateKey) keystore.getKey(ealias, p12password.toCharArray());
-                java.security.cert.Certificate[]  chain = keystore.getCertificateChain(ealias);
+                PrivateKey key = (PrivateKey) keystore.getKey(ealias, p12Password.toCharArray());
+                java.security.cert.Certificate[] chain = keystore.getCertificateChain(ealias);
                 X509Certificate[] certs = Arrays.copyOf(chain, chain.length, X509Certificate[].class);
-                request.proceed(key,certs);
+                request.proceed(key, certs);
+//                android.util.Log.v("chromium", "request proceeded");
             } else {
                 request.ignore();
+//                android.util.Log.v("chromium", "request ignored");
             }
         } catch (Exception ex) {
+//            android.util.Log.v("chromium", "Exception in client-certificate plugin happened.");
             ex.printStackTrace();
             request.ignore();
         }
@@ -76,8 +67,8 @@ public class ClientCertificate extends CordovaPlugin {
     @Override
     public boolean execute(String action, JSONArray a, CallbackContext c) throws JSONException {
         if (action.equals("registerAuthenticationCertificate")) {
-            p12path = a.getString(0);
-            p12password = a.getString(1);
+            p12FileName = a.getString(0);
+            p12Password = a.getString(1);
             return true;
         }
         return false;
